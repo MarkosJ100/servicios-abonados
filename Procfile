@@ -1,2 +1,2 @@
-release: python migrate.py
+release: flask db upgrade
 web: gunicorn app:app
