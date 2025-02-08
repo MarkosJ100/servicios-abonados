@@ -445,9 +445,9 @@ def cambiar_estado_multiple():
 
 if __name__ == '__main__':
     print("Aplicación iniciada. Abre http://localhost:5000 en tu navegador.")
-    app.run(host='0.0.0.0', port=5000, debug=True)
-
-except Exception as e:
-    print("Error al iniciar la aplicación:")
-    print(traceback.format_exc())
-    sys.exit(1)
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=True)
+    except Exception as e:
+        print("Error al iniciar la aplicación:")
+        print(traceback.format_exc())
+        sys.exit(1)
