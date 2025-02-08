@@ -32,9 +32,14 @@ migrate = Migrate(app, db)
 
 # Configuración de Tesseract OCR con manejo de errores
 try:
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    # Configuración condicional para Tesseract
+    if os.path.exists(r'C:\Program Files\Tesseract-OCR\tesseract.exe'):
+        pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    else:
+        # Usar ruta de sistema o desactivar si no está disponible
+        pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 except Exception as e:
-    print("Advertencia: Tesseract OCR no encontrado. La importación de PDFs sin tablas podría no funcionar.")
+    print("Advertencia: Tesseract OCR no configurado. La importación de PDFs sin tablas podría no funcionar.")
     pytesseract = None
 
 print("Iniciando aplicación...")
