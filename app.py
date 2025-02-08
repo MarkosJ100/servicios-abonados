@@ -2,6 +2,9 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from email_validator import validate_email, EmailNotValidError
 from datetime import datetime
 import pandas as pd
 import tabula
@@ -30,19 +33,24 @@ app.config['SECRET_KEY'] = os.environ.get(
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# Configuración de Tesseract OCR con manejo de errores
-try:
-    # Configuración condicional para Tesseract
-    if os.path.exists(r'C:\Program Files\Tesseract-OCR\tesseract.exe'):
-        pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-    else:
-        # Usar ruta de sistema o desactivar si no está disponible
-        pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-except Exception as e:
-    print("Advertencia: Tesseract OCR no configurado. La importación de PDFs sin tablas podría no funcionar.")
-    pytesseract = None
+# Configuración de Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 
-print("Iniciando aplicación...")
+# Modelos de base de datos
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 class Registro(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -54,37 +62,75 @@ class Registro(db.Model):
     pagado = db.Column(db.Boolean, default=False, nullable=False)
 
     def __repr__(self):
-        return f'<Registro {self.id}>'
+        return f'<Registro {self.numero_despacho}>'
 
-# Funciones de verificación de dependencias
-def is_java_installed():
-    try:
-        subprocess.run(['java', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
-def is_poppler_installed():
-    try:
-        subprocess.run(['pdftoppm', '-h'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
-
-def init_db():
-    with app.app_context():
-        # Eliminar todas las tablas existentes
-        db.drop_all()
+# Rutas de autenticación
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
         
-        # Crear todas las tablas
-        db.create_all()
+        if user and user.check_password(password):
+            login_user(user)
+            flash('Inicio de sesión exitoso', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Nombre de usuario o contraseña incorrectos', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/registro', methods=['GET', 'POST'])
+def registro():
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        password = request.form['password']
         
-        # Commit para asegurar cambios
+        # Validar email
+        try:
+            valid = validate_email(email)
+            email = valid.email
+        except EmailNotValidError:
+            flash('Correo electrónico inválido', 'error')
+            return redirect(url_for('registro'))
+        
+        # Verificar si el usuario ya existe
+        if User.query.filter_by(username=username).first():
+            flash('Nombre de usuario ya existe', 'error')
+            return redirect(url_for('registro'))
+        
+        if User.query.filter_by(email=email).first():
+            flash('Correo electrónico ya registrado', 'error')
+            return redirect(url_for('registro'))
+        
+        # Crear nuevo usuario
+        new_user = User(username=username, email=email)
+        new_user.set_password(password)
+        
+        db.session.add(new_user)
         db.session.commit()
+        
+        flash('Registro exitoso. Por favor, inicia sesión.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('registro.html')
 
-init_db()
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('Sesión cerrada exitosamente', 'success')
+    return redirect(url_for('login'))
 
+# Resto de las rutas existentes requieren login
 @app.route('/')
+@login_required
 def index():
     # Ordenar registros por fecha de manera descendente (más reciente primero)
     registros = Registro.query.order_by(Registro.fecha.desc()).all()
@@ -111,6 +157,7 @@ def index():
                            companias=companias)
 
 @app.route('/registrar', methods=['POST'])
+@login_required
 def registrar():
     fecha = datetime.strptime(request.form['fecha'], '%Y-%m-%d').date()
     numero_despacho = request.form['numero_despacho']
@@ -130,6 +177,7 @@ def registrar():
     return redirect(url_for('index'))
 
 @app.route('/borrar/<int:id>')
+@login_required
 def borrar(id):
     registro = Registro.query.get_or_404(id)
     db.session.delete(registro)
@@ -137,6 +185,7 @@ def borrar(id):
     return redirect(url_for('index'))
 
 @app.route('/cambiar_estado/<int:id>')
+@login_required
 def cambiar_estado(id):
     registro = Registro.query.get_or_404(id)
     registro.estado = 'Pagado' if registro.estado == 'Pendiente' else 'Pendiente'
@@ -144,6 +193,7 @@ def cambiar_estado(id):
     return redirect(url_for('index'))
 
 @app.route('/eliminar/<int:id>', methods=['GET'])
+@login_required
 def eliminar(id):
     try:
         # Buscar el registro por ID
@@ -164,6 +214,7 @@ def eliminar(id):
     return redirect(url_for('index'))
 
 @app.route('/resumen_diario', methods=['GET', 'POST'])
+@login_required
 def resumen_diario():
     if request.method == 'POST':
         fecha = datetime.strptime(request.form['fecha'], '%Y-%m-%d').date()
@@ -173,6 +224,7 @@ def resumen_diario():
     return render_template('resumen_diario.html')
 
 @app.route('/resumen_mensual', methods=['GET', 'POST'])
+@login_required
 def resumen_mensual():
     if request.method == 'POST':
         fecha = datetime.strptime(request.form['fecha'], '%Y-%m-%d').date()
@@ -185,6 +237,7 @@ def resumen_mensual():
     return render_template('resumen_mensual.html')
 
 @app.route('/exportar_excel')
+@login_required
 def exportar_excel():
     registros = Registro.query.all()
     df = pd.DataFrame([(r.id, r.fecha, r.numero_despacho, r.importe, r.nombre_compania, r.estado) 
@@ -195,6 +248,7 @@ def exportar_excel():
     return send_file(ruta_excel, as_attachment=True)
 
 @app.route('/exportar_pdf')
+@login_required
 def exportar_pdf():
     registros = Registro.query.all()
     ruta_pdf = 'servicios_abonados.pdf'
@@ -227,6 +281,7 @@ def exportar_pdf():
     return send_file(ruta_pdf, as_attachment=True)
 
 @app.route('/importar_pdf', methods=['GET', 'POST'])
+@login_required
 def importar_pdf():
     if request.method == 'POST':
         if 'archivo' not in request.files:
@@ -331,6 +386,7 @@ def importar_pdf():
     return render_template('importar_pdf.html')
 
 @app.route('/cambiar_estado/<int:id>', methods=['GET'])
+@login_required
 def cambiar_estado_pago(id):
     try:
         # Buscar el registro por ID
@@ -352,6 +408,7 @@ def cambiar_estado_pago(id):
     return redirect(url_for('index'))
 
 @app.route('/cambiar_estado_multiple', methods=['POST'])
+@login_required
 def cambiar_estado_multiple():
     try:
         # Obtener los IDs de los registros seleccionados
