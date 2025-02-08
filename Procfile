@@ -1,2 +1,2 @@
-release: flask db upgrade
+release: flask db upgrade --verbose
 web: gunicorn app:app
