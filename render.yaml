@@ -2,8 +2,14 @@ services:
   - type: web
     name: servicios-abonados
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python init_db.py && gunicorn app:app
+    buildCommand: |
+      python3 -m venv venv
+      . venv/bin/activate
+      pip install -r requirements.txt
+    startCommand: |
+      . venv/bin/activate
+      python init_db.py
+      gunicorn app:app
     envVars:
       - key: DATABASE_URL
         fromDatabase:
