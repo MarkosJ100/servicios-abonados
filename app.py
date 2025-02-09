@@ -56,53 +56,6 @@ except Exception as db_init_error:
 project_root = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, project_root)
 
-def ensure_database_initialized():
-    """
-    Ensure database tables are created before any database operations.
-    This is a critical step to prevent 'no such table' errors.
-    """
-    try:
-        # Explicitly create all tables if they don't exist
-        with app.app_context():
-            # Log the current database URL for debugging
-            current_db_url = app.config.get('SQLALCHEMY_DATABASE_URI', 'Not configured')
-            app.logger.info(f"Initializing database: {current_db_url}")
-            
-            # Create all tables
-            db.create_all()
-            
-            # Check if the user table exists and is empty
-            user_count = User.query.count()
-            if user_count == 0:
-                # Create a default admin user if no users exist
-                default_user = User(
-                    username='marcos', 
-                    email='marcos@example.com', 
-                    is_admin=True
-                )
-                default_user.set_password('your_secure_password')  # Replace with a secure password
-                
-                db.session.add(default_user)
-                db.session.commit()
-                app.logger.info("Created default admin user")
-            else:
-                app.logger.info(f"Found {user_count} existing users")
-    
-    except Exception as e:
-        app.logger.error(f"Database initialization error: {str(e)}")
-        # Optionally re-raise the exception if you want to stop the application
-        raise
-
-ensure_database_initialized()
-
-# Configuración de Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-# Add health check routes
-create_health_routes(app)
-
 # Modelos de base de datos
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -200,6 +153,53 @@ class Registro(db.Model):
         """
         self.is_deleted = True
         db.session.commit()
+
+def ensure_database_initialized():
+    """
+    Ensure database tables are created before any database operations.
+    This is a critical step to prevent 'no such table' errors.
+    """
+    try:
+        # Explicitly create all tables if they don't exist
+        with app.app_context():
+            # Log the current database URL for debugging
+            current_db_url = app.config.get('SQLALCHEMY_DATABASE_URI', 'Not configured')
+            app.logger.info(f"Initializing database: {current_db_url}")
+            
+            # Create all tables
+            db.create_all()
+            
+            # Check if the user table exists and is empty
+            user_count = User.query.count()
+            if user_count == 0:
+                # Create a default admin user if no users exist
+                default_user = User(
+                    username='marcos', 
+                    email='marcos@example.com', 
+                    is_admin=True
+                )
+                default_user.set_password('your_secure_password')  # Replace with a secure password
+                
+                db.session.add(default_user)
+                db.session.commit()
+                app.logger.info("Created default admin user")
+            else:
+                app.logger.info(f"Found {user_count} existing users")
+    
+    except Exception as e:
+        app.logger.error(f"Database initialization error: {str(e)}")
+        # Optionally re-raise the exception if you want to stop the application
+        raise
+
+ensure_database_initialized()
+
+# Configuración de Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# Add health check routes
+create_health_routes(app)
 
 @login_manager.user_loader
 def load_user(user_id):
