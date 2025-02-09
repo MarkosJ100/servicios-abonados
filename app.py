@@ -26,13 +26,11 @@ from models import model_registry
 
 # Create Flask application with configuration
 app = Flask(__name__)
-app.config.from_object(get_config())
-
-# Setup logging
-setup_application_logging(app)
 
 # Inicializar base de datos y migración
 try:
+    # Configure database without creating it immediately
+    app.config['SQLALCHEMY_BINDS'] = {}
     db = SQLAlchemy(app)
     migrate = Migrate(app, db)
     
@@ -564,16 +562,39 @@ def cambiar_estado_multiple():
     # Redirigir a la página principal
     return redirect(url_for('index'))
 
+def create_app():
+    """
+    Application factory function to create and configure the Flask application.
+    
+    This allows for flexible application initialization and helps avoid 
+    circular import issues.
+    
+    :return: Configured Flask application instance
+    """
+    # Ensure the application is configured
+    app.config.from_object(get_config())
+
+    # Setup logging
+    setup_application_logging(app)
+
+    # Configuración de Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'login'
+
+    # Add health check routes
+    create_health_routes(app)
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
+
+    # Ensure database is initialized
+    ensure_database_initialized()
+
+    return app
+
+# If this is the main module, create and run the app
 if __name__ == '__main__':
-    # Log startup information
-    app.logger.info("Aplicación iniciada")
-    try:
-        app.run(
-            host='0.0.0.0', 
-            port=5000, 
-            debug=app.config.get('DEBUG', True)
-        )
-    except Exception as e:
-        app.logger.error(f"Error starting application: {e}")
-        app.logger.error(traceback.format_exc())
-        raise
+    app = create_app()
+    app.run(debug=True)

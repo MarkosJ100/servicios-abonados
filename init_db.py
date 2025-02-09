@@ -23,13 +23,25 @@ os.environ['DATABASE_URL'] = os.getenv('DATABASE_URL', 'sqlite:///servicios_abon
 
 def init_database():
     try:
-        # Import the app, database, and model registry
-        from app import create_app
-        from app import db
+        # Import required modules
+        from flask import Flask
+        from flask_sqlalchemy import SQLAlchemy
+        from flask_migrate import Migrate
+        from config import get_config
         from models import model_registry
 
-        # Create application context
-        app = create_app()
+        # Create a new Flask application
+        app = Flask(__name__)
+        
+        # Configure the application
+        app.config.from_object(get_config())
+        
+        # Explicitly set SQLALCHEMY_BINDS to an empty dictionary
+        app.config['SQLALCHEMY_BINDS'] = {}
+        
+        # Initialize database
+        db = SQLAlchemy(app)
+        migrate = Migrate(app, db)
         
         # Initialize models using the registry
         User, Registro = model_registry.init_app(db)
