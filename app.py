@@ -22,7 +22,7 @@ import logging
 from config import get_config
 from logging_config import setup_application_logging
 from health_check import create_health_routes
-from models import init_models
+from models import model_registry
 
 # Create Flask application with configuration
 app = Flask(__name__)
@@ -31,32 +31,16 @@ app.config.from_object(get_config())
 # Setup logging
 setup_application_logging(app)
 
-# Error handling
-@app.errorhandler(Exception)
-def handle_exception(e):
-    # Log the error
-    app.logger.error(f"Unhandled Exception: {str(e)}")
-    app.logger.error(traceback.format_exc())
-    
-    # Return a user-friendly error response
-    return jsonify({
-        'error': 'Internal Server Error',
-        'message': str(e),
-        'trace': traceback.format_exc()
-    }), 500
-
 # Inicializar base de datos y migración
 try:
     db = SQLAlchemy(app)
     migrate = Migrate(app, db)
-    User, Registro = init_models(db)
+    
+    # Initialize models using the registry
+    User, Registro = model_registry.init_app(db)
 except Exception as db_init_error:
     app.logger.error(f"Database Initialization Error: {db_init_error}")
     raise
-
-# Ensure the project root is in the Python path
-project_root = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, project_root)
 
 def ensure_database_initialized():
     """
