@@ -16,6 +16,7 @@ import re
 import subprocess
 from PyPDF2 import PdfReader
 from sqlalchemy import func
+import logging
 
 # Import our new configuration and logging modules
 from config import get_config
@@ -50,6 +51,49 @@ try:
 except Exception as db_init_error:
     app.logger.error(f"Database Initialization Error: {db_init_error}")
     raise
+
+# Ensure the project root is in the Python path
+project_root = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, project_root)
+
+def ensure_database_initialized():
+    """
+    Ensure database tables are created before any database operations.
+    This is a critical step to prevent 'no such table' errors.
+    """
+    try:
+        # Explicitly create all tables if they don't exist
+        with app.app_context():
+            # Log the current database URL for debugging
+            current_db_url = app.config.get('SQLALCHEMY_DATABASE_URI', 'Not configured')
+            app.logger.info(f"Initializing database: {current_db_url}")
+            
+            # Create all tables
+            db.create_all()
+            
+            # Check if the user table exists and is empty
+            user_count = User.query.count()
+            if user_count == 0:
+                # Create a default admin user if no users exist
+                default_user = User(
+                    username='marcos', 
+                    email='marcos@example.com', 
+                    is_admin=True
+                )
+                default_user.set_password('your_secure_password')  # Replace with a secure password
+                
+                db.session.add(default_user)
+                db.session.commit()
+                app.logger.info("Created default admin user")
+            else:
+                app.logger.info(f"Found {user_count} existing users")
+    
+    except Exception as e:
+        app.logger.error(f"Database initialization error: {str(e)}")
+        # Optionally re-raise the exception if you want to stop the application
+        raise
+
+ensure_database_initialized()
 
 # Configuración de Login
 login_manager = LoginManager()
@@ -633,15 +677,6 @@ def cambiar_estado_multiple():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    # Ensure database is created
-    with app.app_context():
-        try:
-            db.create_all()
-            app.logger.info("Database tables created successfully")
-        except Exception as db_create_error:
-            app.logger.error(f"Error creating database tables: {db_create_error}")
-            raise
-
     # Log startup information
     app.logger.info("Aplicación iniciada")
     try:
