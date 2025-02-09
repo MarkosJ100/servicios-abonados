@@ -1,32 +1,39 @@
-# Entorno virtual
+# Python virtual environment
 venv/
 env/
-*.venv
-*.env
+.env
+.venv
 
-# Archivos de Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Base de datos
-*.db
-*.sqlite3
-
-# Archivos generados
-*.xlsx
-*.pdf
-uploads/
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
 
 # Logs
 *.log
+migration.log
 
-# IDEs y editores
+# Database files
+*.db
+*.sqlite3
+
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Sistema operativo
+# OS generated files
 .DS_Store
 Thumbs.db
+
+# Render deployment
+.render/
+
+# Backup files
+*.backup
