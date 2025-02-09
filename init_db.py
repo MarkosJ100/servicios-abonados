@@ -23,12 +23,8 @@ os.environ['DATABASE_URL'] = os.getenv('DATABASE_URL', 'sqlite:///servicios_abon
 
 def init_database():
     try:
-        # Dynamically import Flask app and models to avoid circular imports
-        from app import create_app, db
-        from app import User, Registro  # Import models from app
-
-        # Create application context
-        app = create_app()
+        # Import the existing app and models
+        from app import app, db, User, Registro
         
         logger.info(" Iniciando inicialización de base de datos...")
         logger.info(f" Ruta del proyecto: {project_root}")
