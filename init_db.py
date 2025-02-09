@@ -15,9 +15,8 @@ sys.path.insert(0, project_root)
 # Set environment variables for database configuration
 os.environ['DATABASE_URL'] = os.getenv('DATABASE_URL', 'sqlite:///servicios_abonados.db')
 
-from app import app, db
-from models import User, Registro  # Import all models
-from sqlalchemy import inspect
+# Import the app and models
+from app import app, db, User, Registro
 
 def init_database():
     try:
@@ -44,7 +43,7 @@ def init_database():
                 db.create_all()
             
             # Verify table creation
-            inspector = inspect(db.engine)
+            inspector = db.inspect(db.engine)
             tables = inspector.get_table_names()
             logger.info(f"Existing tables: {tables}")
             
@@ -54,6 +53,7 @@ def init_database():
                 logger.info(f"Columns in {table}: {columns}")
             
             # Create a default admin user if not exists
+            logger.info("Checking for existing admin user...")
             existing_user = User.query.filter_by(username='marcos').first()
             if not existing_user:
                 logger.info("Creating default admin user...")
@@ -74,6 +74,7 @@ def init_database():
     
     except Exception as e:
         logger.error("Critical error during database initialization:")
+        logger.error(f"Error details: {str(e)}")
         logger.error(traceback.format_exc())
         sys.exit(1)
 
