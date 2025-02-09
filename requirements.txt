@@ -39,8 +39,6 @@ PyPDF2==3.0.1
 pytesseract==0.3.13
 python-dateutil==2.9.0.post0
 pytz==2025.1
-pywin32
-pywin32-ctypes==0.2.3
 reportlab==4.3.0
 six==1.17.0
 SQLAlchemy==2.0.38
