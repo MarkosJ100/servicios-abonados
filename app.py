@@ -24,99 +24,47 @@ from logging_config import setup_application_logging
 from health_check import create_health_routes
 from models import model_registry
 
-# Create Flask application with configuration
-app = Flask(__name__)
-
 # Inicializar base de datos y migración
-try:
-    # Configure database without creating it immediately
-    app.config['SQLALCHEMY_BINDS'] = {}
-    db = SQLAlchemy(app)
-    migrate = Migrate(app, db)
-    
-    # Initialize models using the registry
-    User, Registro = model_registry.init_app(db)
-except Exception as db_init_error:
-    app.logger.error(f"Database Initialization Error: {db_init_error}")
-    raise
+db = SQLAlchemy()
+migrate = Migrate()
 
-def ensure_database_initialized():
-    """
-    Ensure database tables are created before any database operations.
-    This is a critical step to prevent 'no such table' errors.
-    """
-    try:
-        # Explicitly create all tables if they don't exist
-        with app.app_context():
-            # Log the current database URL for debugging
-            current_db_url = app.config.get('SQLALCHEMY_DATABASE_URI', 'Not configured')
-            app.logger.info(f"Initializing database: {current_db_url}")
-            
-            # Create all tables
-            db.create_all()
-            
-            # Check if the user table exists and is empty
-            user_count = User.query.count()
-            if user_count == 0:
-                # Create a default admin user if no users exist
-                default_user = User(
-                    username='marcos', 
-                    email='marcos@example.com', 
-                    is_admin=True
-                )
-                default_user.set_password('your_secure_password')  # Replace with a secure password
-                
-                db.session.add(default_user)
-                db.session.commit()
-                app.logger.info("Created default admin user")
-            else:
-                app.logger.info(f"Found {user_count} existing users")
-    
-    except Exception as e:
-        app.logger.error(f"Database initialization error: {str(e)}")
-        # Optionally re-raise the exception if you want to stop the application
-        raise
-
-ensure_database_initialized()
-
-# Configuración de Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-# Add health check routes
-create_health_routes(app)
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
-# Rutas de autenticación
-@app.route('/login', methods=['GET', 'POST'])
 def login():
-    try:
-        if request.method == 'POST':
-            username = request.form['username']
-            password = request.form['password']
-            user = User.query.filter_by(username=username).first()
-            
-            if user and user.check_password(password):
-                login_user(user)
-                flash('Inicio de sesión exitoso', 'success')
-                return redirect(url_for('index'))
-            else:
-                flash('Nombre de usuario o contraseña incorrectos', 'error')
+    """
+    Handle user login.
+    
+    :return: Login page or redirect to main page
+    """
+    # Prevent logged-in users from accessing login page
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    # Handle login form submission
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
         
-        return render_template('login.html')
-    except Exception as e:
-        app.logger.error(f"Error in login route: {e}")
-        return jsonify({
-            'error': 'Internal Server Error',
-            'message': str(e),
-            'trace': traceback.format_exc()
-        }), 500
+        # Find user by username
+        user = User.query.filter_by(username=username).first()
+        
+        # Validate user credentials
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect(url_for('index'))
+        else:
+            flash('Credenciales inválidas. Por favor, intente de nuevo.', 'error')
+    
+    return render_template('login.html')
 
-@app.route('/registro', methods=['GET', 'POST'])
+def logout():
+    """
+    Handle user logout.
+    
+    :return: Redirect to login page
+    """
+    logout_user()
+    flash('Has cerrado sesión exitosamente.', 'success')
+    return redirect(url_for('login'))
+
 def registro():
     try:
         if request.method == 'POST':
@@ -153,31 +101,12 @@ def registro():
         
         return render_template('registro.html')
     except Exception as e:
-        app.logger.error(f"Error in registro route: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': str(e),
             'trace': traceback.format_exc()
         }), 500
 
-@app.route('/logout')
-@login_required
-def logout():
-    try:
-        logout_user()
-        flash('Sesión cerrada exitosamente', 'success')
-        return redirect(url_for('login'))
-    except Exception as e:
-        app.logger.error(f"Error in logout route: {e}")
-        return jsonify({
-            'error': 'Internal Server Error',
-            'message': str(e),
-            'trace': traceback.format_exc()
-        }), 500
-
-# Resto de las rutas existentes requieren login
-@app.route('/')
-@login_required
 def index():
     try:
         # Ordenar registros por fecha de manera descendente (más reciente primero)
@@ -204,15 +133,12 @@ def index():
                                total_registros=total_registros,
                                companias=companias)
     except Exception as e:
-        app.logger.error(f"Error in index route: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': str(e),
             'trace': traceback.format_exc()
         }), 500
 
-@app.route('/registrar', methods=['POST'])
-@login_required
 def registrar():
     try:
         fecha = datetime.strptime(request.form['fecha'], '%Y-%m-%d').date()
@@ -232,15 +158,12 @@ def registrar():
         db.session.commit()
         return redirect(url_for('index'))
     except Exception as e:
-        app.logger.error(f"Error in registrar route: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': str(e),
             'trace': traceback.format_exc()
         }), 500
 
-@app.route('/borrar/<int:id>')
-@login_required
 def borrar(id):
     try:
         registro = Registro.query.get_or_404(id)
@@ -248,15 +171,12 @@ def borrar(id):
         db.session.commit()
         return redirect(url_for('index'))
     except Exception as e:
-        app.logger.error(f"Error in borrar route: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': str(e),
             'trace': traceback.format_exc()
         }), 500
 
-@app.route('/cambiar_estado/<int:id>')
-@login_required
 def cambiar_estado(id):
     try:
         registro = Registro.query.get_or_404(id)
@@ -264,15 +184,12 @@ def cambiar_estado(id):
         db.session.commit()
         return redirect(url_for('index'))
     except Exception as e:
-        app.logger.error(f"Error in cambiar_estado route: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': str(e),
             'trace': traceback.format_exc()
         }), 500
 
-@app.route('/eliminar/<int:id>', methods=['GET'])
-@login_required
 def eliminar(id):
     try:
         # Buscar el registro por ID
@@ -292,8 +209,6 @@ def eliminar(id):
     # Redirigir a la página principal
     return redirect(url_for('index'))
 
-@app.route('/resumen_diario', methods=['GET', 'POST'])
-@login_required
 def resumen_diario():
     try:
         if request.method == 'POST':
@@ -303,15 +218,12 @@ def resumen_diario():
             return render_template('resumen_diario.html', registros=registros, fecha=fecha, total=total)
         return render_template('resumen_diario.html')
     except Exception as e:
-        app.logger.error(f"Error in resumen_diario route: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': str(e),
             'trace': traceback.format_exc()
         }), 500
 
-@app.route('/resumen_mensual', methods=['GET', 'POST'])
-@login_required
 def resumen_mensual():
     try:
         if request.method == 'POST':
@@ -324,15 +236,12 @@ def resumen_mensual():
             return render_template('resumen_mensual.html', registros=registros, fecha=fecha, total=total)
         return render_template('resumen_mensual.html')
     except Exception as e:
-        app.logger.error(f"Error in resumen_mensual route: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': str(e),
             'trace': traceback.format_exc()
         }), 500
 
-@app.route('/exportar_excel')
-@login_required
 def exportar_excel():
     try:
         registros = Registro.query.all()
@@ -343,15 +252,12 @@ def exportar_excel():
         df.to_excel(ruta_excel, index=False)
         return send_file(ruta_excel, as_attachment=True)
     except Exception as e:
-        app.logger.error(f"Error in exportar_excel route: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': str(e),
             'trace': traceback.format_exc()
         }), 500
 
-@app.route('/exportar_pdf')
-@login_required
 def exportar_pdf():
     try:
         registros = Registro.query.all()
@@ -384,15 +290,12 @@ def exportar_pdf():
         
         return send_file(ruta_pdf, as_attachment=True)
     except Exception as e:
-        app.logger.error(f"Error in exportar_pdf route: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': str(e),
             'trace': traceback.format_exc()
         }), 500
 
-@app.route('/importar_pdf', methods=['GET', 'POST'])
-@login_required
 def importar_pdf():
     try:
         if request.method == 'POST':
@@ -497,15 +400,12 @@ def importar_pdf():
         
         return render_template('importar_pdf.html')
     except Exception as e:
-        app.logger.error(f"Error in importar_pdf route: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': str(e),
             'trace': traceback.format_exc()
         }), 500
 
-@app.route('/cambiar_estado/<int:id>', methods=['GET'])
-@login_required
 def cambiar_estado_pago(id):
     try:
         # Buscar el registro por ID
@@ -526,8 +426,6 @@ def cambiar_estado_pago(id):
     # Redirigir a la página principal
     return redirect(url_for('index'))
 
-@app.route('/cambiar_estado_multiple', methods=['POST'])
-@login_required
 def cambiar_estado_multiple():
     try:
         # Obtener los IDs de los registros seleccionados
@@ -562,35 +460,99 @@ def cambiar_estado_multiple():
     # Redirigir a la página principal
     return redirect(url_for('index'))
 
-def create_app():
+def register_routes(app):
+    """
+    Register routes for the application.
+    
+    :param app: Flask application instance
+    """
+    app.add_url_rule('/login', 'login', login, methods=['GET', 'POST'])
+    app.add_url_rule('/logout', 'logout', logout)
+    app.add_url_rule('/registro', 'registro', registro, methods=['GET', 'POST'])
+    app.add_url_rule('/', 'index', index)
+    app.add_url_rule('/registrar', 'registrar', registrar, methods=['POST'])
+    app.add_url_rule('/borrar/<int:id>', 'borrar', borrar)
+    app.add_url_rule('/cambiar_estado/<int:id>', 'cambiar_estado', cambiar_estado)
+    app.add_url_rule('/eliminar/<int:id>', 'eliminar', eliminar, methods=['GET'])
+    app.add_url_rule('/resumen_diario', 'resumen_diario', resumen_diario, methods=['GET', 'POST'])
+    app.add_url_rule('/resumen_mensual', 'resumen_mensual', resumen_mensual, methods=['GET', 'POST'])
+    app.add_url_rule('/exportar_excel', 'exportar_excel', exportar_excel)
+    app.add_url_rule('/exportar_pdf', 'exportar_pdf', exportar_pdf)
+    app.add_url_rule('/importar_pdf', 'importar_pdf', importar_pdf, methods=['GET', 'POST'])
+    app.add_url_rule('/cambiar_estado/<int:id>', 'cambiar_estado_pago', cambiar_estado_pago, methods=['GET'])
+    app.add_url_rule('/cambiar_estado_multiple', 'cambiar_estado_multiple', cambiar_estado_multiple, methods=['POST'])
+
+def create_app(config=None):
     """
     Application factory function to create and configure the Flask application.
     
-    This allows for flexible application initialization and helps avoid 
-    circular import issues.
-    
+    :param config: Optional configuration object to override default config
     :return: Configured Flask application instance
     """
-    # Ensure the application is configured
-    app.config.from_object(get_config())
-
+    # Create Flask application
+    app = Flask(__name__)
+    
+    # Use provided config or default
+    if config:
+        app.config.from_object(config)
+    else:
+        app.config.from_object(get_config())
+    
+    # Explicitly set SQLALCHEMY_BINDS to an empty dictionary if not set
+    app.config.setdefault('SQLALCHEMY_BINDS', {})
+    
     # Setup logging
     setup_application_logging(app)
 
+    # Initialize database
+    db.init_app(app)
+    migrate.init_app(app, db)
+    
+    # Initialize models using the registry
+    User, Registro = model_registry.init_app(db)
+    
     # Configuración de Login
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = 'login'
 
-    # Add health check routes
-    create_health_routes(app)
-
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
 
+    # Add health check routes
+    create_health_routes(app)
+
+    # Register routes
+    register_routes(app)
+
     # Ensure database is initialized
-    ensure_database_initialized()
+    with app.app_context():
+        try:
+            # Create all tables
+            db.create_all()
+            
+            # Check if the user table exists and is empty
+            user_count = User.query.count()
+            if user_count == 0:
+                # Create a default admin user if no users exist
+                default_user = User(
+                    username='marcos', 
+                    email='marcos@example.com', 
+                    is_admin=True
+                )
+                default_user.set_password('your_secure_password')  # Replace with a secure password
+                
+                db.session.add(default_user)
+                db.session.commit()
+                app.logger.info("Created default admin user")
+            else:
+                app.logger.info(f"Found {user_count} existing users")
+        
+        except Exception as e:
+            app.logger.error(f"Database initialization error: {str(e)}")
+            # Optionally re-raise the exception if you want to stop the application
+            raise
 
     return app
 
