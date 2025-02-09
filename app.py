@@ -22,6 +22,7 @@ import logging
 from config import get_config
 from logging_config import setup_application_logging
 from health_check import create_health_routes
+from models import init_models
 
 # Create Flask application with configuration
 app = Flask(__name__)
@@ -48,6 +49,7 @@ def handle_exception(e):
 try:
     db = SQLAlchemy(app)
     migrate = Migrate(app, db)
+    User, Registro = init_models(db)
 except Exception as db_init_error:
     app.logger.error(f"Database Initialization Error: {db_init_error}")
     raise
@@ -55,104 +57,6 @@ except Exception as db_init_error:
 # Ensure the project root is in the Python path
 project_root = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, project_root)
-
-# Modelos de base de datos
-class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False)
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-
-class Registro(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    fecha = db.Column(db.Date, nullable=False)
-    numero_despacho = db.Column(db.String(50), nullable=False, unique=True, index=True)
-    importe = db.Column(db.Float, nullable=False)
-    nombre_compania = db.Column(db.String(100), nullable=False, index=True)
-    estado = db.Column(db.String(20), default='Pendiente')
-    pagado = db.Column(db.Boolean, default=False, nullable=False)
-    
-    # New fields for enhanced tracking
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    fecha_pago = db.Column(db.Date, nullable=True)
-    notas = db.Column(db.Text, nullable=True)
-    
-    # Optional: Link to user who created the record
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    user = db.relationship('User', backref=db.backref('registros', lazy=True))
-    
-    # Soft delete
-    is_deleted = db.Column(db.Boolean, default=False)
-
-    def __repr__(self):
-        return f'<Registro {self.numero_despacho}>'
-    
-    @classmethod
-    def get_overdue_payments(cls, days=30):
-        """
-        Retrieve overdue payments not yet settled
-        :param days: Number of days to consider a payment overdue
-        :return: List of overdue registros
-        """
-        threshold_date = datetime.now().date() - timedelta(days=days)
-        return cls.query.filter(
-            cls.fecha < threshold_date,
-            cls.pagado == False,
-            cls.is_deleted == False
-        ).all()
-    
-    @classmethod
-    def get_company_summary(cls, company_name=None):
-        """
-        Generate financial summary for a company or all companies
-        :param company_name: Optional company name to filter
-        :return: Dictionary with summary statistics
-        """
-        query = cls.query.filter(cls.is_deleted == False)
-        
-        if company_name:
-            query = query.filter(cls.nombre_compania == company_name)
-        
-        total_importe = db.session.query(func.sum(cls.importe)).scalar() or 0
-        total_registros = query.count()
-        pagados = query.filter(cls.pagado == True).count()
-        pendientes = query.filter(cls.pagado == False).count()
-        
-        return {
-            'total_importe': total_importe,
-            'total_registros': total_registros,
-            'pagados': pagados,
-            'pendientes': pendientes,
-            'porcentaje_pagado': (pagados / total_registros * 100) if total_registros > 0 else 0
-        }
-    
-    def mark_as_paid(self, fecha_pago=None, notas=None):
-        """
-        Mark the registro as paid
-        :param fecha_pago: Optional date of payment
-        :param notas: Optional payment notes
-        """
-        self.pagado = True
-        self.estado = 'Pagado'
-        self.fecha_pago = fecha_pago or datetime.now().date()
-        if notas:
-            self.notas = notas
-        db.session.commit()
-    
-    def soft_delete(self):
-        """
-        Soft delete the registro
-        """
-        self.is_deleted = True
-        db.session.commit()
 
 def ensure_database_initialized():
     """

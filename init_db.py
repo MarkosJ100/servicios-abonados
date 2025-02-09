@@ -23,8 +23,16 @@ os.environ['DATABASE_URL'] = os.getenv('DATABASE_URL', 'sqlite:///servicios_abon
 
 def init_database():
     try:
-        # Import the existing app and models
-        from app import app, db, User, Registro
+        # Import the app and models
+        from app import create_app
+        from app import db
+        from models import init_models
+
+        # Create application context
+        app = create_app()
+        
+        # Initialize models
+        User, Registro = init_models(db)
         
         logger.info(" Iniciando inicialización de base de datos...")
         logger.info(f" Ruta del proyecto: {project_root}")
