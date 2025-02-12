@@ -1,115 +1,45 @@
-# Servicios de Abonados
+# Servicios Abonados
 
 ## Descripción
-Aplicación web para gestión de registros de servicios y seguimiento de pagos.
+Aplicación de gestión de servicios y abonados desarrollada con Python y Tkinter. Permite registrar, importar, exportar y gestionar información de servicios y pagos.
 
-## Últimas Mejoras
-- 🚀 Modelo de Registro mejorado
-  * Seguimiento detallado de pagos
-  * Eliminación suave de registros
-  * Métodos avanzados de consulta
-- 🔍 Migración de base de datos más robusta
-  * Respaldo automático antes de migración
-  * Manejo de transformaciones de datos
-  * Registro detallado de procesos de migración
-
-## Estado de Despliegue
-[![Render](https://img.shields.io/badge/Render-Deployed-green)](https://servicios-abonados.onrender.com)
-
-🌐 **URL del Servicio**: https://servicios-abonados.onrender.com
-
-## Características
-- Registro de servicios
-- Importación de PDFs
-- Gestión de estado de pago
-- Exportación a Excel y PDF
-- Resúmenes diarios y mensuales
-- **Nuevo**: Seguimiento detallado de pagos
-- **Nuevo**: Eliminación suave de registros
+## Características Principales
+- Registro de datos de abonados
+- Gestión de albaranes
+- Importación de archivos PDF y Excel
+- Exportación de datos
+- Control de estado de pagos
 
 ## Requisitos
-- Python 3.11.0
-- Flask
-- SQLAlchemy
-- Pandas
-- PyPDF2
-- Tabula-py
-- Pytesseract
+- Python 3.7+
+- Tkinter (incluido en la instalación estándar de Python)
 
-## Instalación Local
-1. Clonar repositorio
-2. Crear entorno virtual
-3. Instalar dependencias:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # En Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
+## Instalación
+1. Clonar el repositorio
+2. (Opcional) Crear un entorno virtual
+3. Instalar dependencias: `pip install -r requirements.txt`
 
-## Ejecución Local
-```bash
-python app.py
-```
+## Crear Ejecutable de Windows
+1. Instalar PyInstaller: `pip install pyinstaller`
+2. Ejecutar: `build_executable.bat`
+3. El ejecutable se encontrará en la carpeta `dist/Servicios_Abonados.exe`
 
-## Pruebas
-Para ejecutar pruebas:
-```bash
-python -m unittest test_migration.py
-```
+### Requisitos para Crear Ejecutable
+- Python 3.7+
+- PyInstaller
+- Todas las dependencias en `requirements.txt`
 
-## Solución de Problemas de Compatibilidad
+## Ejecución
+Ejecutar con: `python app_windows.py`
 
-### NumPy y Pandas
-Si encuentras errores de compatibilidad:
-
-1. Verifica la versión de Python:
-   ```bash
-   python --version
-   ```
-
-2. Actualiza pip y dependencias:
-   ```bash
-   pip install --upgrade pip setuptools wheel
-   pip install --upgrade numpy pandas
-   ```
-
-3. Ejecuta diagnóstico de compatibilidad:
-   ```bash
-   python compatibility_check.py
-   ```
-
-### Errores Comunes
-- **ValueError de dtype**: Indica incompatibilidad binaria
-  * Asegúrate de usar versiones compatibles de NumPy y Pandas
-  * Verifica que la versión de Python sea compatible (3.11.0)
-
-## Despliegue en Render.com
-
-### Configuración
-- **Plataforma**: Render
-- **Tipo de Servicio**: Web Service
-- **Entorno**: Python 3.11
-- **Rama**: main
-
-### Variables de Entorno Necesarias
-- `DATABASE_URL`: Generado automáticamente por Render
-- `SECRET_KEY`: Clave secreta para la aplicación
-
-### Pasos de Despliegue
-1. Conectar repositorio de GitHub
-2. Configurar build command: `pip install -r requirements.txt`
-3. Configurar start command: `gunicorn app:app`
-
-## Consideraciones de Despliegue
-- Plan gratuito con "spin down" después de inactividad
-- Tiempo de inicio inicial puede ser hasta 50 segundos
-- Recomendado usar servicio de monitoreo
-
-## Solución de Problemas
-- Verificar logs de despliegue
-- Comprobar versiones de dependencias
-- Asegurar permisos de base de datos
-- Revisar `migration.log` para detalles de migración
+## Funcionalidades
+- Registro de fecha
+- Captura de número de albarán
+- Registro de nombre de abonado
+- Registro de importe
+- Importación de archivos
+- Exportación de datos
+- Gestión de estados de pago
 
 ## Licencia
-MIT License
+MIT
